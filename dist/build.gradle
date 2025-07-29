@@ -173,7 +173,7 @@ task docker(group: 'Build',
     workingDir = file('.')
     executable 'docker'
 
-    def imageName = 'ghcr.io/line/centraldogma'
+    def imageName = 'seonghyeon/centraldogma-multiplatform-test'
     def imageVersion = project.hasProperty('version') ? project.project('version') : project.version
     def platforms = ['linux/amd64', 'linux/arm64']
 
