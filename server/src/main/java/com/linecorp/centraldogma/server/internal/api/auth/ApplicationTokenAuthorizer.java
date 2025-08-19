@@ -35,6 +35,7 @@ import com.linecorp.armeria.server.ServiceRequestContext;
 import com.linecorp.centraldogma.server.internal.admin.auth.AbstractAuthorizer;
 import com.linecorp.centraldogma.server.internal.admin.auth.AuthUtil;
 import com.linecorp.centraldogma.server.internal.api.HttpApiUtil;
+import com.linecorp.centraldogma.server.metadata.IpAccessControlUtils;
 import com.linecorp.centraldogma.server.metadata.Token;
 import com.linecorp.centraldogma.server.metadata.TokenNotFoundException;
 import com.linecorp.centraldogma.server.metadata.Tokens;
@@ -64,9 +65,19 @@ public class ApplicationTokenAuthorizer extends AbstractAuthorizer {
         try {
             final Token appToken = tokenLookupFunc.apply(accessToken);
             if (appToken != null && appToken.isActive()) {
+                // Check IP access control rules
+                final SocketAddress ra = ctx.remoteAddress();
+                if (ra instanceof InetSocketAddress) {
+                    final String clientIp = ((InetSocketAddress) ra).getHostString();
+                    if (!IpAccessControlUtils.evaluateIpAccessRules(clientIp, appToken.ipAccessControlRules())) {
+                        logger.debug("Access denied for token {} from IP address {} due to IP access control rules",
+                                   maskToken(accessToken), clientIp);
+                        return UnmodifiableFuture.completedFuture(false);
+                    }
+                }
+
                 final String appId = appToken.appId();
                 final StringBuilder login = new StringBuilder(appId);
-                final SocketAddress ra = ctx.remoteAddress();
                 if (ra instanceof InetSocketAddress) {
                     login.append('@').append(((InetSocketAddress) ra).getHostString());
                 }

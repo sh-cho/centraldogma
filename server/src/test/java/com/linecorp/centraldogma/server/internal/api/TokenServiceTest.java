@@ -138,12 +138,12 @@ class TokenServiceTest {
 
     @Test
     void systemAdminToken() {
-        final Token token = tokenService.createToken("forAdmin1", true, true, null,
+        final Token token = tokenService.createToken("forAdmin1", true, true, null, null,
                                                      systemAdminAuthor, systemAdmin).join()
                                         .content();
         assertThat(token.isActive()).isTrue();
         assertThatThrownBy(
-                () -> tokenService.createToken("forAdmin2", true, true, null, guestAuthor, guest)
+                () -> tokenService.createToken("forAdmin2", true, true, null, null, guestAuthor, guest)
                                   .join())
                 .isInstanceOf(IllegalArgumentException.class);
 

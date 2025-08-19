@@ -20,10 +20,12 @@ import static com.google.common.base.Preconditions.checkArgument;
 import static java.util.Objects.requireNonNull;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import javax.annotation.Nullable;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
@@ -52,6 +54,7 @@ import com.linecorp.centraldogma.server.internal.api.AbstractService;
 import com.linecorp.centraldogma.server.internal.api.HttpApiUtil;
 import com.linecorp.centraldogma.server.internal.api.auth.RequiresSystemAdministrator;
 import com.linecorp.centraldogma.server.internal.api.converter.CreateApiResponseConverter;
+import com.linecorp.centraldogma.server.metadata.IpAccessControlRule;
 import com.linecorp.centraldogma.server.metadata.MetadataService;
 import com.linecorp.centraldogma.server.metadata.Token;
 import com.linecorp.centraldogma.server.metadata.User;
@@ -107,6 +110,7 @@ public class TokenService extends AbstractService {
                                                                 @Param @Default("false") boolean isAdmin,
                                                                 @Param @Default("false") boolean isSystemAdmin,
                                                                 @Param @Nullable String secret,
+                                                                @Param @Nullable String ipAccessControlRules,
                                                                 Author author, User loginUser) {
         final boolean isSystemAdminToken = isSystemAdmin || isAdmin;
         checkArgument(!isSystemAdminToken || loginUser.isSystemAdmin(),
@@ -116,11 +120,21 @@ public class TokenService extends AbstractService {
                       "Only system administrators are allowed to create a new token from " +
                       " the given secret string");
 
+        // Parse IP access control rules if provided
+        List<IpAccessControlRule> parsedRules = null;
+        if (ipAccessControlRules != null && !ipAccessControlRules.trim().isEmpty()) {
+            try {
+                parsedRules = Jackson.readValue(ipAccessControlRules, new TypeReference<List<IpAccessControlRule>>() {});
+            } catch (Exception e) {
+                throw new IllegalArgumentException("Invalid IP access control rules JSON: " + e.getMessage(), e);
+            }
+        }
+
         final CompletableFuture<Revision> tokenFuture;
         if (secret != null) {
-            tokenFuture = mds.createToken(author, appId, secret, isSystemAdminToken);
+            tokenFuture = mds.createToken(author, appId, secret, isSystemAdminToken, parsedRules);
         } else {
-            tokenFuture = mds.createToken(author, appId, isSystemAdminToken);
+            tokenFuture = mds.createToken(author, appId, isSystemAdminToken, parsedRules);
         }
         return tokenFuture
                 .thenCompose(unused -> fetchTokensByAppId(appId))

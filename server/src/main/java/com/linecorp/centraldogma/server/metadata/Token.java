@@ -19,6 +19,9 @@ package com.linecorp.centraldogma.server.metadata;
 import static com.google.common.base.MoreObjects.firstNonNull;
 import static java.util.Objects.requireNonNull;
 
+import java.util.Collections;
+import java.util.List;
+
 import javax.annotation.Nullable;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
@@ -28,6 +31,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonInclude.Include;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.base.MoreObjects;
+import com.google.common.collect.ImmutableList;
 
 import com.linecorp.centraldogma.common.ProjectRole;
 import com.linecorp.centraldogma.internal.Util;
@@ -71,9 +75,14 @@ public final class Token implements Identifiable {
     @Nullable
     private final UserAndTimestamp deletion;
 
+    /**
+     * IP access control rules for this token.
+     */
+    private final List<IpAccessControlRule> ipAccessControlRules;
+
     Token(String appId, String secret, boolean isSystemAdmin, boolean allowGuestAccess,
           UserAndTimestamp creation) {
-        this(appId, secret, null, isSystemAdmin, allowGuestAccess, creation, null, null);
+        this(appId, secret, null, isSystemAdmin, allowGuestAccess, creation, null, null, null);
     }
 
     /**
@@ -88,7 +97,8 @@ public final class Token implements Identifiable {
                  @JsonProperty("allowGuestAccess") @Nullable Boolean allowGuestAccess,
                  @JsonProperty("creation") UserAndTimestamp creation,
                  @JsonProperty("deactivation") @Nullable UserAndTimestamp deactivation,
-                 @JsonProperty("deletion") @Nullable UserAndTimestamp deletion) {
+                 @JsonProperty("deletion") @Nullable UserAndTimestamp deletion,
+                 @JsonProperty("ipAccessControlRules") @Nullable List<IpAccessControlRule> ipAccessControlRules) {
         assert isAdmin != null || isSystemAdmin != null;
         this.appId = Util.validateFileName(appId, "appId");
         this.secret = Util.validateFileName(secret, "secret");
@@ -98,16 +108,26 @@ public final class Token implements Identifiable {
         this.creation = requireNonNull(creation, "creation");
         this.deactivation = deactivation;
         this.deletion = deletion;
+        this.ipAccessControlRules = ipAccessControlRules == null ? 
+                Collections.emptyList() : ImmutableList.copyOf(ipAccessControlRules);
     }
 
     private Token(String appId, boolean isSystemAdmin, boolean allowGuestAccess, UserAndTimestamp creation,
                   @Nullable UserAndTimestamp deactivation, @Nullable UserAndTimestamp deletion) {
+        this(appId, isSystemAdmin, allowGuestAccess, creation, deactivation, deletion, null);
+    }
+
+    private Token(String appId, boolean isSystemAdmin, boolean allowGuestAccess, UserAndTimestamp creation,
+                  @Nullable UserAndTimestamp deactivation, @Nullable UserAndTimestamp deletion,
+                  @Nullable List<IpAccessControlRule> ipAccessControlRules) {
         this.appId = Util.validateFileName(appId, "appId");
         this.isSystemAdmin = isSystemAdmin;
         this.allowGuestAccess = allowGuestAccess;
         this.creation = requireNonNull(creation, "creation");
         this.deactivation = deactivation;
         this.deletion = deletion;
+        this.ipAccessControlRules = ipAccessControlRules == null ? 
+                Collections.emptyList() : ImmutableList.copyOf(ipAccessControlRules);
         secret = null;
     }
 
@@ -191,6 +211,14 @@ public final class Token implements Identifiable {
         return deletion != null;
     }
 
+    /**
+     * Returns the IP access control rules for this token.
+     */
+    @JsonProperty
+    public List<IpAccessControlRule> ipAccessControlRules() {
+        return ipAccessControlRules;
+    }
+
     @Override
     public String toString() {
         // Do not add "secret" to prevent it from logging.
@@ -201,6 +229,7 @@ public final class Token implements Identifiable {
                           .add("creation", creation())
                           .add("deactivation", deactivation())
                           .add("deletion", deletion())
+                          .add("ipAccessControlRules", ipAccessControlRules.isEmpty() ? null : ipAccessControlRules)
                           .toString();
     }
 
@@ -208,11 +237,12 @@ public final class Token implements Identifiable {
      * Returns a new {@link Token} instance without its secret.
      */
     public Token withoutSecret() {
-        return new Token(appId(), isSystemAdmin(), allowGuestAccess(), creation(), deactivation(), deletion());
+        return new Token(appId(), isSystemAdmin(), allowGuestAccess(), creation(), deactivation(), deletion(),
+                         ipAccessControlRules());
     }
 
     /**
-     * Returns a new {@link Token} instance without its secret.
+     * Returns a new {@link Token} instance with the specified system admin privilege.
      * This method must be called by the token whose secret is not null.
      */
     public Token withSystemAdmin(boolean isSystemAdmin) {
@@ -222,6 +252,6 @@ public final class Token implements Identifiable {
         final String secret = secret();
         assert secret != null;
         return new Token(appId(), secret, null, isSystemAdmin, allowGuestAccess(), creation(),
-                         deactivation(), deletion());
+                         deactivation(), deletion(), ipAccessControlRules());
     }
 }

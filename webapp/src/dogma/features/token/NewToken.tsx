@@ -17,10 +17,13 @@ import {
   PopoverTrigger,
   Spacer,
   useDisclosure,
+  VStack,
 } from '@chakra-ui/react';
 import { SerializedError } from '@reduxjs/toolkit';
 import { FetchBaseQueryError } from '@reduxjs/toolkit/query';
 import { DisplaySecretModal } from 'dogma/features/token/DisplaySecretModal';
+import { IpAccessControlRule } from 'dogma/features/token/TokenDto';
+import IpAccessControlForm from 'dogma/features/token/IpAccessControlForm';
 import { useAddNewTokenMutation } from 'dogma/features/api/apiSlice';
 import { newNotification } from 'dogma/features/notification/notificationSlice';
 import ErrorMessageParser from 'dogma/features/services/ErrorMessageParser';
@@ -55,17 +58,31 @@ export const NewToken = () => {
   } = useForm<FormData>();
   const [addNewToken, { isLoading }] = useAddNewTokenMutation();
   const [tokenDetail, setTokenDetail] = useState(null);
+  const [ipAccessControlRules, setIpAccessControlRules] = useState<IpAccessControlRule[]>([]);
   const dispatch = useAppDispatch();
   const { user } = useAppSelector((state) => state.auth);
   const onSubmit = async (formData: FormData) => {
-    const data = `appId=${formData.appId}&isSystemAdmin=${formData.isSystemAdmin || false}`;
+    const tokenData = {
+      appId: formData.appId,
+      isSystemAdmin: formData.isSystemAdmin || false,
+      ipAccessControlRules: ipAccessControlRules.length > 0 ? ipAccessControlRules : undefined,
+    };
+
+    const data = new URLSearchParams();
+    data.append('appId', tokenData.appId);
+    data.append('isSystemAdmin', tokenData.isSystemAdmin.toString());
+    if (tokenData.ipAccessControlRules) {
+      data.append('ipAccessControlRules', JSON.stringify(tokenData.ipAccessControlRules));
+    }
+
     try {
-      const response = await addNewToken({ data }).unwrap();
+      const response = await addNewToken({ data: data.toString() }).unwrap();
       if ((response as { error: FetchBaseQueryError | SerializedError }).error) {
         throw (response as { error: FetchBaseQueryError | SerializedError }).error;
       }
       setTokenDetail(response);
       reset();
+      setIpAccessControlRules([]);
       onNewTokenFormClose();
       onSecretModalToggle();
     } catch (error) {
@@ -87,34 +104,37 @@ export const NewToken = () => {
             New Token
           </Button>
         </PopoverTrigger>
-        <PopoverContent minWidth="max-content">
+        <PopoverContent minWidth="max-content" maxW="2xl">
           <PopoverHeader pt={4} fontWeight="bold" border={0} mb={3}>
             Create a new token
           </PopoverHeader>
           <PopoverArrow />
           <PopoverCloseButton />
           <form onSubmit={handleSubmit(onSubmit)}>
-            <PopoverBody minWidth="md">
-              <FormControl isInvalid={errors.appId ? true : false} isRequired>
-                <FormLabel>Application ID</FormLabel>
-                <Input
-                  type="text"
-                  placeholder="my-app-id"
-                  {...register('appId', { pattern: APP_ID_PATTERN })}
-                />
-                <FormHelperText pl={1}>Register the token with a project before accessing it.</FormHelperText>
-                {errors.appId && (
-                  <FormErrorMessage>The first/last character must be alphanumeric</FormErrorMessage>
+            <PopoverBody minWidth="md" maxH="500px" overflowY="auto">
+              <VStack spacing={4} align="stretch">
+                <FormControl isInvalid={errors.appId ? true : false} isRequired>
+                  <FormLabel>Application ID</FormLabel>
+                  <Input
+                    type="text"
+                    placeholder="my-app-id"
+                    {...register('appId', { pattern: APP_ID_PATTERN })}
+                  />
+                  <FormHelperText pl={1}>Register the token with a project before accessing it.</FormHelperText>
+                  {errors.appId && (
+                    <FormErrorMessage>The first/last character must be alphanumeric</FormErrorMessage>
+                  )}
+                </FormControl>
+                {user.roles.includes('LEVEL_SYSTEM_ADMIN') && (
+                  <Flex>
+                    <Spacer />
+                    <Checkbox colorScheme="teal" {...register('isSystemAdmin')}>
+                      System Administrator-Level Token
+                    </Checkbox>
+                  </Flex>
                 )}
-              </FormControl>
-              {user.roles.includes('LEVEL_SYSTEM_ADMIN') && (
-                <Flex mt={4}>
-                  <Spacer />
-                  <Checkbox colorScheme="teal" {...register('isSystemAdmin')}>
-                    System Administrator-Level Token
-                  </Checkbox>
-                </Flex>
-              )}
+                <IpAccessControlForm rules={ipAccessControlRules} onChange={setIpAccessControlRules} />
+              </VStack>
             </PopoverBody>
             <PopoverFooter border="0" display="flex" alignItems="center" justifyContent="space-between" pb={4}>
               <Spacer />

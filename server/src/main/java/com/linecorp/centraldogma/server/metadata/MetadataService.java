@@ -28,6 +28,7 @@ import static com.linecorp.centraldogma.server.storage.project.InternalProjectIn
 import static java.util.Objects.requireNonNull;
 
 import java.util.Collection;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -975,6 +976,15 @@ public class MetadataService {
     }
 
     /**
+     * Creates a new {@link Token} with the specified {@code appId}, {@code isSystemAdmin}
+     * and {@code ipAccessControlRules}.
+     */
+    public CompletableFuture<Revision> createToken(Author author, String appId, boolean isSystemAdmin,
+                                                   @Nullable List<IpAccessControlRule> ipAccessControlRules) {
+        return createToken(author, appId, SECRET_PREFIX + UUID.randomUUID(), isSystemAdmin, ipAccessControlRules);
+    }
+
+    /**
      * Creates a new user-level {@link Token} with the specified {@code appId} and {@code secret}.
      */
     public CompletableFuture<Revision> createToken(Author author, String appId, String secret) {
@@ -986,6 +996,16 @@ public class MetadataService {
      */
     public CompletableFuture<Revision> createToken(Author author, String appId, String secret,
                                                    boolean isSystemAdmin) {
+        return createToken(author, appId, secret, isSystemAdmin, null);
+    }
+
+    /**
+     * Creates a new {@link Token} with the specified {@code appId}, {@code secret}, {@code isSystemAdmin}
+     * and {@code ipAccessControlRules}.
+     */
+    public CompletableFuture<Revision> createToken(Author author, String appId, String secret,
+                                                   boolean isSystemAdmin,
+                                                   @Nullable List<IpAccessControlRule> ipAccessControlRules) {
         requireNonNull(author, "author");
         requireNonNull(appId, "appId");
         requireNonNull(secret, "secret");
@@ -994,8 +1014,8 @@ public class MetadataService {
 
         // Does not allow guest access for normal tokens.
         final boolean allowGuestAccess = isSystemAdmin;
-        final Token newToken = new Token(appId, secret, isSystemAdmin, allowGuestAccess,
-                                         UserAndTimestamp.of(author));
+        final Token newToken = new Token(appId, secret, null, isSystemAdmin, allowGuestAccess,
+                                         UserAndTimestamp.of(author), null, null, ipAccessControlRules);
         final JsonPointer appIdPath = JsonPointer.compile("/appIds" + encodeSegment(newToken.id()));
         final String newTokenSecret = newToken.secret();
         assert newTokenSecret != null;
@@ -1029,9 +1049,9 @@ public class MetadataService {
 
             final String secret = token.secret();
             assert secret != null;
-            final Token newToken = new Token(token.appId(), secret, token.isSystemAdmin(),
-                                             token.isSystemAdmin(), token.allowGuestAccess(),
-                                             token.creation(), token.deactivation(), userAndTimestamp);
+            final Token newToken = new Token(token.appId(), secret, null, token.isSystemAdmin(), 
+                                             token.allowGuestAccess(), token.creation(), token.deactivation(), 
+                                             userAndTimestamp, token.ipAccessControlRules());
             return new Tokens(updateMap(tokens.appIds(), appId, newToken), tokens.secrets());
         });
         return tokenRepo.push(INTERNAL_PROJECT_DOGMA, Project.REPO_DOGMA, author, commitSummary, transformer);
@@ -1118,9 +1138,9 @@ public class MetadataService {
             }
             final String secret = token.secret();
             assert secret != null;
-            final Token newToken = new Token(token.appId(), secret, token.isSystemAdmin(),
-                                             token.isSystemAdmin(), token.allowGuestAccess(), token.creation(),
-                                             userAndTimestamp, null);
+            final Token newToken = new Token(token.appId(), secret, null, token.isSystemAdmin(),
+                                             token.allowGuestAccess(), token.creation(),
+                                             userAndTimestamp, null, token.ipAccessControlRules());
             final Map<String, Token> newAppIds = updateMap(tokens.appIds(), appId, newToken);
             final Map<String, String> newSecrets =
                     removeFromMap(tokens.secrets(), secret); // Note that the key is secret not appId.
