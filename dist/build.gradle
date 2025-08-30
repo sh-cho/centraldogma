@@ -9,13 +9,9 @@ buildscript {
 }
 
 plugins {
-    alias libs.plugins.docker apply false
     alias libs.plugins.download
 }
 
-apply plugin: 'com.bmuschko.docker-remote-api'
-
-import com.bmuschko.gradle.docker.tasks.image.DockerBuildImage
 import com.google.common.base.CaseFormat
 
 ext {
