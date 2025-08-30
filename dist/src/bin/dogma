@@ -2,23 +2,31 @@
 
 OS=$(uname -s)
 MACH=$(uname -m)
+NATIVE_DIR="$(dirname "$0")/native"
 
-DOGMA_BIN="$(dirname "$0")/native"
+# Check if generic dogma binary exists (for Docker containers)
+GENERIC_DOGMA_BIN="${NATIVE_DIR}/dogma"
+if [[ -f "${GENERIC_DOGMA_BIN}" ]]; then
+  exec "$GENERIC_DOGMA_BIN" "$@"
+fi
 
+# Fallback to platform-specific binaries (for local installations)
 if [[ "${OS}" == 'Darwin' ]]; then
   if [[ "${MACH}" == 'x86_64' ]]; then
-    DOGMA_BIN="${DOGMA_BIN}/dogma.darwin-amd64"
+    DOGMA_BIN="${NATIVE_DIR}/dogma.darwin-amd64"
   elif [[ "${MACH}" == 'arm64' ]]; then
-    DOGMA_BIN="${DOGMA_BIN}/dogma.darwin-arm64"
+    DOGMA_BIN="${NATIVE_DIR}/dogma.darwin-arm64"
   else
     echo "32-bit OS is not supported by default: ${OS}-${MACH}"
     exit 1
   fi
 elif [[ "${OS}" == 'Linux' ]]; then
   if [[ "${MACH}" == 'x86_64' ]]; then
-    DOGMA_BIN="${DOGMA_BIN}/dogma.linux-amd64"
+    DOGMA_BIN="${NATIVE_DIR}/dogma.linux-amd64"
+  elif [[ "${MACH}" == 'aarch64' ]]; then
+    DOGMA_BIN="${NATIVE_DIR}/dogma.linux-arm64"
   else
-    echo "32-bit OS is not supported by default: ${OS}-${MACH}"
+    echo "Architecture not supported by default: ${OS}-${MACH}"
     exit 1
   fi
 else

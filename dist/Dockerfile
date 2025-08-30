@@ -3,6 +3,9 @@
 #
 FROM openjdk:11-jre
 
+# Build argument for target architecture (automatically set by docker buildx)
+ARG TARGETARCH
+
 # Environment variables.
 ENV CENTRALDOGMA_HOME "/opt/centraldogma"
 ENV CENTRALDOGMA_OPTS ""
@@ -22,10 +25,14 @@ COPY build/dist/LICENSE.txt  "$CENTRALDOGMA_HOME"/
 COPY build/dist/NOTICE.txt   "$CENTRALDOGMA_HOME"/
 COPY build/dist/README.md    "$CENTRALDOGMA_HOME"/
 COPY build/dist/bin/*        "$CENTRALDOGMA_HOME"/bin/
-COPY build/dist/bin/native/* "$CENTRALDOGMA_HOME"/bin/native/
 COPY build/dist/conf/*       "$CENTRALDOGMA_HOME"/conf/
 COPY build/dist/lib/*        "$CENTRALDOGMA_HOME"/lib/
 COPY build/dist/licenses/*   "$CENTRALDOGMA_HOME"/licenses/
+
+# Copy platform-specific dogma binary based on target platform
+COPY --chmod=755 \
+  build/dist/bin/native/dogma.linux-${TARGETARCH} \
+  "$CENTRALDOGMA_HOME"/bin/native/dogma
 
 # Expose ports.
 EXPOSE 36462
